@@ -1,109 +1,183 @@
-Simple Concurrent HTTP Server in x86-64 Assembly
+# x86 HTTP Server
 
-This project implements a minimal web server entirely in Linux x86-64 assembly using direct system calls (without libc). The server supports handling multiple clients concurrently by creating a new process for each incoming connection using fork().
+A minimal concurrent HTTP server written entirely in x86-64 Linux assembly using direct Linux syscalls.
 
-Features
-Creates a TCP socket using socket()
-Binds to 0.0.0.0:80 using bind()
-Waits for connections using listen() and accept()
-Handles multiple clients concurrently with fork()
-Supports HTTP GET requests
-Extracts requested file path
-Opens the file
-Reads its contents
-Sends contents back to client
-Supports HTTP POST requests
-Extracts target file path
-Finds request body after HTTP headers
-Creates/writes data into file
-Sends HTTP response:
+The server supports both **HTTP GET** and **HTTP POST** requests and handles multiple clients simultaneously using `fork()`.
+
+---
+
+## Features
+
+- TCP socket creation using `socket()`
+- Binds to `0.0.0.0:80`
+- Waits for incoming connections using `listen()` and `accept()`
+- Handles multiple clients concurrently with `fork()`
+- Supports:
+
+### GET Requests
+The server:
+
+1. Reads incoming request
+2. Extracts requested file path
+3. Opens target file
+4. Reads contents
+5. Sends:
+
+```http
 HTTP/1.0 200 OK
-Properly closes sockets and exits child processes
-Workflow
-Server startup
-Create socket
-socket()
-Bind socket to:
-0.0.0.0 : 80
-Start listening:
-listen()
-Main loop
 
-Server continuously:
-
-accept()
-fork()
-
-Parent process:
-
-closes client socket
-continues waiting for new clients
-
-Child process:
-
-handles request
-exits after responding
-
-This allows concurrent requests.
-
-Handling GET requests
-
-Example request:
-
-GET /file.txt HTTP/1.1
-
-Steps:
-
-Read incoming request
-Extract path:
-/file.txt
-Open file
-open()
-Read file contents
-read()
-Send:
-HTTP/1.0 200 OK
 <file contents>
-Handling POST requests
+```
 
-Example request:
+Example:
 
+```http
+GET /file.txt HTTP/1.1
+```
+
+---
+
+### POST Requests
+
+The server:
+
+1. Reads full HTTP request
+2. Extracts file path
+3. Finds request body after:
+
+```text
+\r\n\r\n
+```
+
+4. Creates/opens file
+5. Writes body contents into file
+6. Sends:
+
+```http
+HTTP/1.0 200 OK
+```
+
+Example:
+
+```http
 POST /data.txt HTTP/1.1
 Content-Length: ...
 
-hello
+hello world
+```
 
-Steps:
+---
 
-Read full request
-Extract target path
-/data.txt
-Find body after:
-\r\n\r\n
-Create/open file
-open(O_CREAT | O_WRONLY)
-Write body to file
-write()
-Return:
-HTTP/1.0 200 OK
-Linux syscalls used
-Syscall	Purpose
-socket	Create TCP socket
-bind	Attach socket to port
-listen	Wait for connections
-accept	Accept client
-fork	Handle clients concurrently
-read	Read requests/files
-write	Send responses
-open	Open/create files
-close	Close descriptors
-exit	Terminate process
-Result
+## Concurrency
 
-The final server behaves like a very small web server capable of:
+Every incoming connection creates a child process using:
 
-serving files (GET)
-storing uploaded data (POST)
-handling multiple clients simultaneously
+```text
+fork()
+```
 
-All implemented directly in assembly using Linux syscalls.
+Parent process:
+
+- closes connected socket
+- continues accepting new clients
+
+Child process:
+
+- handles GET/POST request
+- sends response
+- exits
+
+This allows multiple requests to be processed simultaneously.
+
+---
+
+## Linux Syscalls Used
+
+| Syscall | Purpose |
+|----------|----------|
+| socket | Create TCP socket |
+| bind | Bind socket to port |
+| listen | Listen for clients |
+| accept | Accept connection |
+| fork | Handle concurrent clients |
+| read | Read requests/files |
+| write | Send responses |
+| open | Open/create files |
+| close | Close file descriptors |
+| exit | Terminate process |
+
+---
+
+## Build
+
+Assemble:
+
+```bash
+as -o server.o file.s
+```
+
+Link:
+
+```bash
+ld -o server server.o
+```
+
+Run:
+
+```bash
+sudo ./server
+```
+
+Root privileges are required because the server binds to port `80`.
+
+---
+
+## Workflow
+
+Server startup:
+
+```text
+socket()
+bind()
+listen()
+```
+
+Main loop:
+
+```text
+accept()
+fork()
+```
+
+Request handling:
+
+```text
+GET  -> open file -> read -> write response
+POST -> open/create file -> write body -> send response
+```
+
+---
+
+## Learning Goals
+
+This project was built to understand:
+
+- x86-64 Assembly
+- Linux syscalls
+- Socket programming
+- Process creation with `fork()`
+- HTTP protocol basics
+- Concurrent servers
+- Low-level systems programming
+
+---
+
+## Result
+
+The final program behaves as a small web server capable of:
+
+- serving files through GET requests
+- storing uploaded data through POST requests
+- handling multiple clients at the same time
+
+All implemented directly in assembly without using libc or external libraries.
